@@ -6,4 +6,7 @@ RUN apt -y update && apt -y install git vim less python3-pip wget curl libgl1-me
 
 WORKDIR /app
 RUN pip3 install transformers \
-        Pillow
+        Pillow \
+        requests \
+        tqdm \
+        git+https://github.com/openai/CLIP.git
