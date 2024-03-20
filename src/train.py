@@ -13,7 +13,7 @@ MODEL_NAME = "openai/clip-vit-base-patch32"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 EPOCHS = 10
 CLIP_DIM = 64
-MODEL_TO_SAVE = "models/vrchat"
+MODEL_TRAINED = "/app/models/vrchat"
 
 model = CLIPModel.from_pretrained(MODEL_NAME).to(DEVICE)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
@@ -84,7 +84,7 @@ def train(dataset_path="/app/data/best_worlds.csv"):
             total_loss += loss.item()
 
         print(f"\nEpoch {epoch}/{EPOCHS}, Total Loss: {total_loss:.4f}\n")
-        model.save_pretrained(MODEL_TO_SAVE)
+        model.save_pretrained(MODEL_TRAINED)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Let's party !")
