@@ -10,3 +10,6 @@ RUN pip3 install transformers \
         requests \
         tqdm \
         git+https://github.com/openai/CLIP.git
+
+ENV PYTHONPATH="${PYTHONPATH}:/app/src"
+ENV TOKENIZERS_PARALLELISM=false
