@@ -8,8 +8,7 @@ WORKDIR /app
 RUN pip3 install transformers \
         Pillow \
         requests \
-        tqdm \
-        git+https://github.com/openai/CLIP.git
+        tqdm
 
 ENV PYTHONPATH="${PYTHONPATH}:/app/src"
 ENV TOKENIZERS_PARALLELISM=false

@@ -9,7 +9,7 @@ WITH worlds as (
     release_status,
   FROM crawled.worlds
   WHERE thumbnail_image_url IS NOT NULL
-  QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY crawled_at DESC) = 1
+  QUALIFY ROW_NUMBER() OVER (PARTITION BY id ORDER BY visits DESC) = 1
 )
 SELECT
   id,
@@ -18,6 +18,6 @@ SELECT
   favorites,
   thumbnail_image_url,
 FROM worlds
-WHERE release_status = "public"
+WHERE release_status != "hidden"
 ORDER BY favorites + SQRT(visits) DESC
-LIMIT 10000
+LIMIT 15000
