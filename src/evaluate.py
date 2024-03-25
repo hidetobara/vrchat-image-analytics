@@ -16,6 +16,7 @@ def search_title(image_path, worlds):
     processor = AutoProcessor.from_pretrained(MODEL_PROCESSOR)
 
     img = util.load_good_image(image_path)
+    print("IMAGE_PATH=", image_path)
     titles = list(map(lambda x: x["author"] + " " + x["title"], worlds))
 
     with torch.no_grad():
@@ -29,22 +30,23 @@ def search_title(image_path, worlds):
     top_values, top_indices = torch.topk(probs, k=5)
     for r, idx in enumerate(top_indices):
         print("P=", top_values[r], "Title=", titles[idx])
-    #torch.save(text_embeds, "/app/data/worlds.text.pt")
+    torch.save(text_embeds, "/app/data/worlds.text.pt")
 
 def search_title_using_embeds(image_path, worlds, embeds_path):
     model = CLIPVisionModelWithProjection.from_pretrained(MODEL_TRAINED).to(DEVICE)
     processor = AutoProcessor.from_pretrained(MODEL_PROCESSOR)
 
     text_embeds = torch.load(embeds_path).cpu()
-    print("TEXT=", text_embeds.shape)
+    #print("TEXT=", text_embeds.shape)
     img = util.load_good_image(image_path)
+    print("IMAGE_PATH=", image_path)
 
     with torch.no_grad():
         inputs = processor(images=img, return_tensors="pt")
         inputs = inputs.to(DEVICE)
         outputs = model(**inputs)
         image_embeds = outputs.image_embeds.cpu()
-    print("IMAGE=", image_embeds.shape)
+    #print("IMAGE=", image_embeds.shape)
     dist = torch.cdist(text_embeds, image_embeds)
     dist = torch.reshape(dist, [-1])
     indices = torch.argsort(dist)

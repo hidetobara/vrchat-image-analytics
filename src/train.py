@@ -12,8 +12,8 @@ import util
 
 MODEL_NAME = "openai/clip-vit-base-patch32"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-EPOCHS = 15
-TRAIN_DIM = 64
+EPOCHS = 20
+TRAIN_DIM = 128
 MODEL_TRAINED = "/app/models/vrchat-worlds"
 MODEL_PROCESSOR = "/app/models/processor"
 
