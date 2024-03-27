@@ -5,8 +5,10 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
+import torchvision
 from transformers import AutoProcessor, CLIPModel, AutoTokenizer
 import numpy
+import random
 
 import util
 
@@ -37,18 +39,17 @@ class TitleAndImage(Dataset):
         self.texts.append(text)
         self.images.append(image)
 
-    def load_dataset(self, path, dl_dir="/app/data/images"):
+    def load_dataset(self, path, limit, dl_dir="/app/data/images"):
         worlds = util.load_worlds(path)
         for w in worlds:
-
             img_path = os.path.join(dl_dir, w["id"] + ".png")
             if not os.path.exists(img_path):
                 continue
             title = w["author"] + " " + w["title"]
-            img = Image.open(img_path)
-            img = img.convert("RGB")
-            img = img.resize((224, 224), Image.Resampling.LANCZOS)
+            img = util.load_good_image(img_path, resize=256)
             self.append(title, numpy.array(img))
+            if len(self.texts) >= limit:
+                break
         print("LOADED_WORLDS=", len(self.texts))
 
     def divide(self, picked, mod=3):
@@ -65,15 +66,16 @@ class TitleAndImage(Dataset):
         print("DIVIDED=", len(train), len(validation))
         return train, validation
 
-def train(dataset_path="/app/data/best_worlds.csv"):
+def train(dataset_path="/app/data/best_worlds.csv", limit=100000):
     dataset = TitleAndImage()
-    dataset.load_dataset(dataset_path)
-    train_data, validation_data = dataset.divide(200)
+    dataset.load_dataset(dataset_path, limit)
+    train_data, validation_data = dataset.divide(100)
     train_loader = DataLoader(train_data, batch_size=TRAIN_DIM, shuffle=True, num_workers=1, drop_last=True)
     VALIDATION_DIM = len(validation_data)
     validation_loader = DataLoader(validation_data, batch_size=VALIDATION_DIM, num_workers=1)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, eps=1e-6, weight_decay=0.2)
+    scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
     loss_img_and_txt = nn.CrossEntropyLoss(reduction="mean")
 
     start = time.time()
@@ -83,8 +85,17 @@ def train(dataset_path="/app/data/best_worlds.csv"):
             optimizer.zero_grad()
 
             texts, images = batch
+            cropped_images = []
+            for image in images:
+                width, height, _ = image.shape
+                wp = random.randint(0, width-224)
+                hp = random.randint(0, height-224)
+                cropped = image[wp:wp+224, hp:hp+224, :]
+                cropped_images.append(cropped)
+            cropped_images = torch.stack(cropped_images, dim=0)
+
             texts = tokenizer(texts, padding=True, truncation=True, max_length=32, return_tensors="pt")
-            images = processor(images=images, return_tensors="pt")
+            images = processor(images=cropped_images, return_tensors="pt")
             texts = texts.to(DEVICE)
             images = images.to(DEVICE)
 
@@ -101,6 +112,7 @@ def train(dataset_path="/app/data/best_worlds.csv"):
             # Backward pass
             loss.backward()
             optimizer.step()
+            scheduler.step()
             print(f"Loss: {loss.item():.4f}\r", end="")
             train_loss += loss.item()
 
@@ -123,7 +135,8 @@ def train(dataset_path="/app/data/best_worlds.csv"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Let's party !")
     parser.add_argument('--train', action="store_true", help="train")
+    parser.add_argument('--limit', type=int, default=100000, help="limit")
     args = parser.parse_args()
 
     if args.train:
-        train()
+        train(limit=args.limit)

@@ -19,8 +19,17 @@ def load_worlds(path="/app/data/best_worlds.csv", ignore_no_image=False):
             worlds.append({"id": wid, "author": author, "title": title, "image_url": image_url})
     return worlds
 
-def load_good_image(path):
+def load_good_image(path, resize=224):
+    img = load_resized_image(path, resize=resize)
+    left = (img.width - resize) // 2
+    upper = (img.height - resize) // 2
+    right = left + resize
+    lower = upper + resize
+    return img.crop((left, upper, right, lower))
+
+def load_resized_image(path, resize=256):
     img = Image.open(path)
     img = img.convert("RGB")
-    img = img.resize((224, 224), Image.Resampling.LANCZOS)
-    return img
+    w, h = img.size
+    r = resize / min(w, h)
+    return img.resize((int(w*r),int(h*r)), Image.Resampling.LANCZOS)
