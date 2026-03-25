@@ -10,7 +10,7 @@ def load_worlds(path="/app/data/best_worlds.csv", ignore_no_image=False):
             if len(items) < 5 or items[0].startswith("#"):
                 continue
             wid = items[0]
-            img_path = os.path.join("/app/data/images", wid + ".png")
+            img_path = os.path.join("/app/data/old/images", wid + ".png")
             if ignore_no_image and not os.path.exists(img_path):
                 continue
             author = items[1]

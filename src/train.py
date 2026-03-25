@@ -6,13 +6,13 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 import torchvision
-from transformers import AutoProcessor, SiglipModel, AutoTokenizer
+from transformers import AutoProcessor, AutoModel, AutoTokenizer
 import numpy
 import random
 
 import util
 
-MODEL_NAME = "google/siglip-base-patch16-224"
+MODEL_NAME = "google/siglip2-base-patch16-224"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -38,7 +38,7 @@ class TitleAndImage(Dataset):
         self.texts.append(text)
         self.images.append(image)
 
-    def load_dataset(self, path, limit, dl_dir="/app/data/images"):
+    def load_dataset(self, path, limit, dl_dir="/app/data/old/images"):
         worlds = util.load_worlds(path)
         for w in worlds:
             img_path = os.path.join(dl_dir, w["id"] + ".png")
@@ -49,6 +49,7 @@ class TitleAndImage(Dataset):
             self.append(title, numpy.array(img))
             if len(self.texts) >= limit:
                 break
+        print(img_path)
         print("LOADED_WORLDS=", len(self.texts))
 
     def divide(self, picked, mod=3):
@@ -67,7 +68,7 @@ class TitleAndImage(Dataset):
 
 
 def train(model_path, batch_size, epochs, dataset_path="/app/data/best_worlds.csv", limit=100000):
-    model = SiglipModel.from_pretrained(MODEL_NAME).to(DEVICE)
+    model = AutoModel.from_pretrained(MODEL_NAME).to(DEVICE)
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     processor = AutoProcessor.from_pretrained(MODEL_NAME)
     processor_path = model_path + "_processor"
@@ -131,10 +132,10 @@ def train(model_path, batch_size, epochs, dataset_path="/app/data/best_worlds.cs
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SigLIP fine-tuning for VRChat worlds")
     parser.add_argument('--train', action="store_true", help="train")
-    parser.add_argument('--limit', type=int, default=100000, help="max training samples")
-    parser.add_argument('--model', type=str, default="/app/models/vrchat-worlds", help="path to save the fine-tuned model")
+    parser.add_argument('--limit', type=int, default=1000, help="max training samples")
+    parser.add_argument('--model', type=str, default="/app/tuned/tmp", help="path to save the fine-tuned model")
     parser.add_argument('--batch_size', type=int, default=128, help="training batch size")
-    parser.add_argument('--epochs', type=int, default=20, help="number of training epochs")
+    parser.add_argument('--epochs', type=int, default=10, help="number of training epochs")
     args = parser.parse_args()
 
     if args.train:
