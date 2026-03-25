@@ -11,16 +11,11 @@ def download_worlds(worlds):
     for n, w in enumerate(worlds):
         if download_image(w["image_url"], w["id"]) == 0:
             continue
-        time.sleep(1)
+        time.sleep(0.3)
         if n % 100 == 0:
             print(f"[DONE] N={n}")
 
-def download_image(url, filename, dl_dir="/app/data/images") -> int:
-    path = os.path.join(dl_dir, filename + ".png")
-    if os.path.exists(path):
-        print("ALREADY=", filename)
-        return 0
-
+def download_image(url, wid, dl_dir="/app/data/images") -> int:
     ua_str = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/91.0.4472.80 Mobile/15E148 Safari/604.1"
     headers = {
         'User-Agent': ua_str,
@@ -36,8 +31,14 @@ def download_image(url, filename, dl_dir="/app/data/images") -> int:
     if 'image' not in content_type:
         print("TYPE=", content_type)
         return -1
+    
+    cells = url.split("/")
+    filename = cells[-2]
 
-    with open(os.path.join(dl_dir, filename + ".png"), "wb") as f:
+    box_dir = os.path.join(dl_dir, wid[-2:], wid)
+    os.makedirs(box_dir, exist_ok=True)
+
+    with open(os.path.join(box_dir, filename + ".png"), "wb") as f:
         f.write(response.content)
     return 1
 

@@ -16,7 +16,8 @@ def load_worlds(path="/app/data/best_worlds.csv", ignore_no_image=False):
             author = items[1]
             title = items[2]
             image_url = items[4]
-            worlds.append({"id": wid, "author": author, "title": title, "image_url": image_url})
+            description = items[5]
+            worlds.append({"id": wid, "author": author, "title": title, "image_url": image_url, "description": description})
     return worlds
 
 def load_good_image(path, resize=224):

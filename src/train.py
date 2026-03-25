@@ -3,25 +3,24 @@ import time
 import os
 from PIL import Image
 import torch
+import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
-import torch.nn as nn
 import torchvision
-from transformers import AutoProcessor, CLIPModel, AutoTokenizer
+from transformers import AutoProcessor, SiglipModel, AutoTokenizer
 import numpy
 import random
 
 import util
 
-MODEL_NAME = "openai/clip-vit-base-patch32"
+MODEL_NAME = "google/siglip-base-patch16-224"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-EPOCHS = 20
-TRAIN_DIM = 128
-MODEL_TRAINED = "/app/models/vrchat-worlds"
-MODEL_PROCESSOR = "/app/models/processor"
 
-model = CLIPModel.from_pretrained(MODEL_NAME).to(DEVICE)
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-processor = AutoProcessor.from_pretrained(MODEL_NAME)
+
+def siglip_loss(logits_per_image):
+    """SigLIP sigmoid loss. Treats each pair independently as binary classification."""
+    batch_size = logits_per_image.shape[0]
+    labels = 2 * torch.eye(batch_size, device=logits_per_image.device) - 1  # 1 for match, -1 for non-match
+    return -torch.mean(F.logsigmoid(labels * logits_per_image))
 
 
 class TitleAndImage(Dataset):
@@ -34,7 +33,7 @@ class TitleAndImage(Dataset):
 
     def __len__(self) -> int:
         return len(self.images)
-    
+
     def append(self, text, image):
         self.texts.append(text)
         self.images.append(image)
@@ -66,20 +65,25 @@ class TitleAndImage(Dataset):
         print("DIVIDED=", len(train), len(validation))
         return train, validation
 
-def train(dataset_path="/app/data/best_worlds.csv", limit=100000):
+
+def train(model_path, batch_size, epochs, dataset_path="/app/data/best_worlds.csv", limit=100000):
+    model = SiglipModel.from_pretrained(MODEL_NAME).to(DEVICE)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    processor = AutoProcessor.from_pretrained(MODEL_NAME)
+    processor_path = model_path + "_processor"
+
     dataset = TitleAndImage()
     dataset.load_dataset(dataset_path, limit)
     train_data, validation_data = dataset.divide(100)
-    train_loader = DataLoader(train_data, batch_size=TRAIN_DIM, shuffle=True, num_workers=1, drop_last=True)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=1, drop_last=True)
     VALIDATION_DIM = len(validation_data)
     validation_loader = DataLoader(validation_data, batch_size=VALIDATION_DIM, num_workers=1)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5, eps=1e-6, weight_decay=0.2)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
-    loss_img_and_txt = nn.CrossEntropyLoss(reduction="mean")
 
     start = time.time()
-    for epoch in range(EPOCHS):
+    for epoch in range(epochs):
         train_loss = 0
         for batch in train_loader:
             optimizer.zero_grad()
@@ -88,55 +92,50 @@ def train(dataset_path="/app/data/best_worlds.csv", limit=100000):
             cropped_images = []
             for image in images:
                 width, height, _ = image.shape
-                wp = random.randint(0, width-224)
-                hp = random.randint(0, height-224)
+                wp = random.randint(0, width - 224)
+                hp = random.randint(0, height - 224)
                 cropped = image[wp:wp+224, hp:hp+224, :]
                 cropped_images.append(cropped)
             cropped_images = torch.stack(cropped_images, dim=0)
 
-            texts = tokenizer(texts, padding=True, truncation=True, max_length=32, return_tensors="pt")
+            texts = tokenizer(texts, padding="max_length", truncation=True, max_length=64, return_tensors="pt")
             images = processor(images=cropped_images, return_tensors="pt")
             texts = texts.to(DEVICE)
             images = images.to(DEVICE)
 
-            # Forward pass
             outputs = model(**texts, **images)
-            #print("OUTPUTS=", outputs)
+            loss = siglip_loss(outputs.logits_per_image)
 
-            # Compute loss
-            #print("TXT=", outputs.logits_per_text.shape)
-            #print("IMG=", outputs.logits_per_image)
-            ground_truth = torch.arange(TRAIN_DIM, dtype=torch.long, device=DEVICE)
-            loss = loss_img_and_txt(outputs.logits_per_text, ground_truth) + loss_img_and_txt(outputs.logits_per_image, ground_truth)
-
-            # Backward pass
             loss.backward()
             optimizer.step()
             scheduler.step()
             print(f"Loss: {loss.item():.4f}\r", end="")
             train_loss += loss.item()
 
-        for batch in validation_loader:
-            texts, images = batch
-            texts = tokenizer(texts, padding=True, truncation=True, max_length=32, return_tensors="pt")
-            images = processor(images=images, return_tensors="pt")
-            texts = texts.to(DEVICE)
-            images = images.to(DEVICE)
-            # Forward pass
-            outputs = model(**texts, **images)
-            ground_truth = torch.arange(VALIDATION_DIM, dtype=torch.long, device=DEVICE)
-            validation_loss = loss_img_and_txt(outputs.logits_per_text, ground_truth) + loss_img_and_txt(outputs.logits_per_image, ground_truth)
+        with torch.no_grad():
+            for batch in validation_loader:
+                texts, images = batch
+                texts = tokenizer(texts, padding="max_length", truncation=True, max_length=64, return_tensors="pt")
+                images = processor(images=images, return_tensors="pt")
+                texts = texts.to(DEVICE)
+                images = images.to(DEVICE)
+                outputs = model(**texts, **images)
+                validation_loss = siglip_loss(outputs.logits_per_image)
 
         passed = time.time() - start
-        print(f"\n{passed:.1f} sec, Epoch {epoch}/{EPOCHS}, Train Loss: {train_loss:.4f}, Validation Loss {validation_loss.item():.4f}\n")
-        model.save_pretrained(MODEL_TRAINED)
-        processor.save_pretrained(MODEL_PROCESSOR)
+        print(f"\n{passed:.1f} sec, Epoch {epoch}/{epochs}, Train Loss: {train_loss:.4f}, Validation Loss {validation_loss.item():.4f}\n")
+        model.save_pretrained(model_path)
+        processor.save_pretrained(processor_path)
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Let's party !")
+    parser = argparse.ArgumentParser(description="SigLIP fine-tuning for VRChat worlds")
     parser.add_argument('--train', action="store_true", help="train")
-    parser.add_argument('--limit', type=int, default=100000, help="limit")
+    parser.add_argument('--limit', type=int, default=100000, help="max training samples")
+    parser.add_argument('--model', type=str, default="/app/models/vrchat-worlds", help="path to save the fine-tuned model")
+    parser.add_argument('--batch_size', type=int, default=128, help="training batch size")
+    parser.add_argument('--epochs', type=int, default=20, help="number of training epochs")
     args = parser.parse_args()
 
     if args.train:
-        train(limit=args.limit)
+        train(limit=args.limit, model_path=args.model, batch_size=args.batch_size, epochs=args.epochs)

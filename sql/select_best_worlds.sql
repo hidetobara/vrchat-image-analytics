@@ -5,6 +5,7 @@ WITH worlds as (
     author_name,
     favorites,
     visits,
+    description,
     thumbnail_image_url,
     release_status,
   FROM crawled.worlds
@@ -17,7 +18,8 @@ SELECT
   name,
   favorites,
   thumbnail_image_url,
+  REPLACE(REPLACE(description, ",", ""), "\n", "\t") as description,
 FROM worlds
 WHERE release_status != "hidden"
 ORDER BY favorites + SQRT(visits) DESC
-LIMIT 15000
+LIMIT 30000
