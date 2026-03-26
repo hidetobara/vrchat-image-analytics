@@ -18,8 +18,8 @@ SELECT
   name,
   favorites,
   thumbnail_image_url,
-  REPLACE(REPLACE(description, ",", ""), "\n", "\t") as description,
+--  REPLACE(REPLACE(description, ",", ""), "\n", "\t") as description,
 FROM worlds
 WHERE release_status != "hidden"
 ORDER BY favorites + SQRT(visits) DESC
-LIMIT 30000
+LIMIT 50000

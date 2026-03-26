@@ -12,7 +12,7 @@ import random
 
 import util
 
-MODEL_NAME = "google/siglip2-base-patch16-224"
+MODEL_NAME = "google/siglip2-base-patch16-256"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -41,7 +41,7 @@ class TitleAndImage(Dataset):
     def load_dataset(self, path, limit, dl_dir="/app/data/old/images"):
         worlds = util.load_worlds(path)
         for w in worlds:
-            img_path = os.path.join(dl_dir, w["id"] + ".png")
+            _, img_path = util.get_box_path(w["id"])
             if not os.path.exists(img_path):
                 continue
             title = w["author"] + " " + w["title"]

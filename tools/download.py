@@ -8,39 +8,47 @@ import util
 
 
 def download_worlds(worlds):
+    done = 0
     for n, w in enumerate(worlds):
-        if download_image(w["image_url"], w["id"]) == 0:
-            continue
-        time.sleep(0.3)
+        time.sleep(0.01)
+        flag = download_image(w["image_url"], w["id"])
+        if flag >= 0:
+            time.sleep(2.0)
+        if flag > 0:
+            done += 1
         if n % 100 == 0:
-            print(f"[DONE] N={n}")
+            print(f"[DONE/N]={done}/{n}", flush=True)
 
 def download_image(url, wid, dl_dir="/app/data/images") -> int:
-    ua_str = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/91.0.4472.80 Mobile/15E148 Safari/604.1"
-    headers = {
-        'User-Agent': ua_str,
-        'content-type': 'image/png'
-    }
+    try:
+        box_dir, path = util.get_box_path(wid)
+        if os.path.exists(path):
+            return -1
+        os.makedirs(box_dir, exist_ok=True)
 
-    response = requests.get(url, headers=headers, allow_redirects=True)
-    if response.status_code != 200:
-        print("STATUS=", response.status_code, url)
-        return -1
+        ua_str = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/91.0.4472.80 Mobile/15E148 Safari/604.1"
+        headers = {
+            'User-Agent': ua_str,
+            'content-type': 'image/png'
+        }
 
-    content_type = response.headers["content-type"]
-    if 'image' not in content_type:
-        print("TYPE=", content_type)
-        return -1
-    
-    cells = url.split("/")
-    filename = cells[-2]
+        response = requests.get(url, headers=headers, allow_redirects=True)
+        if response.status_code != 200:
+            print("STATUS=", response.status_code, url)
+            return 0
 
-    box_dir = os.path.join(dl_dir, wid[-2:], wid)
-    os.makedirs(box_dir, exist_ok=True)
+        content_type = response.headers["content-type"]
+        if 'image' not in content_type:
+            print("TYPE=", content_type)
+            return 0
 
-    with open(os.path.join(box_dir, filename + ".png"), "wb") as f:
-        f.write(response.content)
-    return 1
+        with open(path, "wb") as f:
+            f.write(response.content)
+        return 1
+    except Exception as ex:
+        print("ERROR", str(ex), wid)
+        print("URL=", url)
+        return 0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Let's download !")
@@ -54,3 +62,4 @@ if __name__ == "__main__":
         worlds = worlds[:args.limit]
     download_worlds(worlds)
     
+# python3 download.py --worlds /app/data/best_worlds.2026.csv --limit 1000 > download.out &
