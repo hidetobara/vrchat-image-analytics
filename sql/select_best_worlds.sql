@@ -20,6 +20,6 @@ SELECT
   thumbnail_image_url,
 --  REPLACE(REPLACE(description, ",", ""), "\n", "\t") as description,
 FROM worlds
-WHERE release_status != "hidden"
+WHERE release_status = "public"
 ORDER BY favorites + SQRT(visits) DESC
 LIMIT 50000

@@ -13,11 +13,12 @@ def download_worlds(worlds):
         time.sleep(0.01)
         flag = download_image(w["image_url"], w["id"])
         if flag >= 0:
-            time.sleep(2.0)
+            time.sleep(5.0)
         if flag > 0:
             done += 1
-        if n % 100 == 0:
+        if n > 0 and n % 100 == 0:
             print(f"[DONE/N]={done}/{n}", flush=True)
+    print("[END]")
 
 def download_image(url, wid, dl_dir="/app/data/images") -> int:
     try:
@@ -47,19 +48,21 @@ def download_image(url, wid, dl_dir="/app/data/images") -> int:
         return 1
     except Exception as ex:
         print("ERROR", str(ex), wid)
-        print("URL=", url)
+        print("URL=", url, flush=True)
+        time.sleep(15.0)
         return 0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Let's download !")
     parser.add_argument('--worlds', help="infomations of worlds, CSV format")
+    parser.add_argument('--start', type=int, default=0, help="start")
     parser.add_argument('--limit', type=int, default=10, help="limit")
     args = parser.parse_args()
 
     if args.worlds:
         worlds = util.load_worlds(args.worlds)
     if args.limit < len(worlds):
-        worlds = worlds[:args.limit]
+        worlds = worlds[args.start:args.start+args.limit]
     download_worlds(worlds)
     
-# python3 download.py --worlds /app/data/best_worlds.2026.csv --limit 1000 > download.out &
+# python3 download.py --worlds /app/data/best_worlds.2026.csv --limit 10000 > download.out &
